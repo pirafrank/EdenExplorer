@@ -171,3 +171,7 @@ launch-window-not-ready =
     Jendela EdenExplorer yang sedang berjalan tidak siap.
 launch-window-rejected = 
     Jendela EdenExplorer yang sedang berjalan tidak menerima permintaan.
+
+settings_listing_order = Urutan daftar
+settings_listing_order_windows = Gaya Windows (folder terlebih dahulu)
+settings_listing_order_linux = Gaya Linux (campur berdasarkan kolom)

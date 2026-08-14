@@ -171,3 +171,7 @@ launch-window-not-ready =
     运行中的 EdenExplorer 窗口未准备好。
 launch-window-rejected = 
     运行中的 EdenExplorer 窗口拒绝了请求。
+
+settings_listing_order = 列表顺序
+settings_listing_order_windows = Windows 样式（文件夹优先）
+settings_listing_order_linux = Linux 样式（按所选列混合排序）

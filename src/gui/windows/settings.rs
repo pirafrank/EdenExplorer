@@ -7,7 +7,7 @@ use crate::core::{
 };
 use crate::gui::i18n::I18n;
 use crate::gui::theme::ThemePalette;
-use crate::gui::utils::SortColumn;
+use crate::gui::utils::{ListingOrder, SortColumn};
 use crate::gui::windows::containers::enums::ItemViewerHeaderColumn;
 use crate::gui::windows::enums::SettingsAction;
 use crate::gui::windows::structs::{AppSettings, SettingsWindow};
@@ -33,6 +33,7 @@ impl Default for AppSettings {
             date_style: DateStyle::default(),
             sort_column: SortColumn::Name,
             sort_ascending: true,
+            listing_order: ListingOrder::default(),
             language: "en-US".to_string(),
             item_viewer_file_column_order: vec![
                 ItemViewerHeaderColumn::Type,
@@ -421,6 +422,45 @@ pub fn draw_settings_window(
 
                                 if selected_style != settings.current_settings.date_style {
                                     settings.current_settings.date_style = selected_style;
+                                    action = Some(SettingsAction::ApplySettings);
+                                }
+                            },
+                        );
+                        setting_row(
+                            ui,
+                            |ui| {
+                                setting_label(ui, &i18n.tr("settings_listing_order"), None, palette)
+                            },
+                            |ui| {
+                                let mut selected = settings.current_settings.listing_order;
+                                draw_dropdown(
+                                    ui,
+                                    palette,
+                                    "listing_order_selector",
+                                    SETTINGS_COMBO_WIDTH,
+                                    match selected {
+                                        ListingOrder::Windows => {
+                                            i18n.tr("settings_listing_order_windows")
+                                        }
+                                        ListingOrder::Linux => {
+                                            i18n.tr("settings_listing_order_linux")
+                                        }
+                                    },
+                                    |ui| {
+                                        ui.selectable_value(
+                                            &mut selected,
+                                            ListingOrder::Windows,
+                                            i18n.tr("settings_listing_order_windows"),
+                                        );
+                                        ui.selectable_value(
+                                            &mut selected,
+                                            ListingOrder::Linux,
+                                            i18n.tr("settings_listing_order_linux"),
+                                        );
+                                    },
+                                );
+                                if selected != settings.current_settings.listing_order {
+                                    settings.current_settings.listing_order = selected;
                                     action = Some(SettingsAction::ApplySettings);
                                 }
                             },

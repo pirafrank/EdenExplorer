@@ -58,6 +58,8 @@ struct AppSettingsSnapshot {
         Vec<crate::gui::windows::containers::enums::ItemViewerHeaderColumn>,
     #[serde(default = "default_recycle_bin_column_order")]
     recycle_bin_column_order: Vec<crate::gui::windows::containers::enums::ItemViewerHeaderColumn>,
+    #[serde(default = "default_listing_order")]
+    listing_order: crate::gui::utils::ListingOrder,
 }
 
 // Legacy snapshot struct for deserializing old settings with HalfScreen
@@ -94,6 +96,7 @@ impl From<LegacyAppSettingsSnapshot> for AppSettingsSnapshot {
             date_style: default_date_style(),
             sort_column: legacy.sort_column,
             sort_ascending: legacy.sort_ascending,
+            listing_order: default_listing_order(),
             language: default_language(),
             item_viewer_file_column_order: default_item_viewer_file_column_order(),
             item_viewer_drive_column_order: default_item_viewer_drive_column_order(),
@@ -178,6 +181,10 @@ where
 
 fn default_sort_column() -> crate::gui::utils::SortColumn {
     crate::gui::utils::SortColumn::Name
+}
+
+fn default_listing_order() -> crate::gui::utils::ListingOrder {
+    crate::gui::utils::ListingOrder::default()
 }
 
 fn default_language() -> String {
@@ -329,6 +336,7 @@ pub fn load_app_settings() -> (
     bool,
     crate::gui::utils::SortColumn,
     bool,
+    crate::gui::utils::ListingOrder,
     String,
     DateStyle,
     Vec<crate::gui::windows::containers::enums::ItemViewerHeaderColumn>,
@@ -364,6 +372,7 @@ pub fn load_app_settings() -> (
         snapshot.time_format_24h,
         snapshot.sort_column,
         snapshot.sort_ascending,
+        snapshot.listing_order,
         snapshot.language,
         snapshot.date_style,
         snapshot.item_viewer_file_column_order,
@@ -386,6 +395,7 @@ fn default_app_settings(
     bool,
     crate::gui::utils::SortColumn,
     bool,
+    crate::gui::utils::ListingOrder,
     String,
     DateStyle,
     Vec<crate::gui::windows::containers::enums::ItemViewerHeaderColumn>,
@@ -404,6 +414,7 @@ fn default_app_settings(
         false,
         crate::gui::utils::SortColumn::Name,
         true,
+        crate::gui::utils::ListingOrder::default(),
         default_language(),
         DateStyle::default(),
         default_item_viewer_file_column_order(),
@@ -424,6 +435,7 @@ pub fn save_app_settings(
     time_format_24h: bool,
     sort_column: crate::gui::utils::SortColumn,
     sort_ascending: bool,
+    listing_order: crate::gui::utils::ListingOrder,
     language: &str,
     date_style: DateStyle,
     item_viewer_file_column_order: &[crate::gui::windows::containers::enums::ItemViewerHeaderColumn],
@@ -448,6 +460,7 @@ pub fn save_app_settings(
         date_style,
         sort_column,
         sort_ascending,
+        listing_order,
         language: language.to_string(),
         item_viewer_file_column_order: item_viewer_file_column_order.to_vec(),
         item_viewer_drive_column_order: item_viewer_drive_column_order.to_vec(),

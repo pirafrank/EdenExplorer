@@ -263,6 +263,7 @@
 - [x] Enable/Disable Windows shell integration. By enabling, the context menu will populate with default Windows registry context menu items
 - [x] New context menu command (Copy Path) with keyboard shortcut of Ctrl+Shift+C
 - [x] Column sorting saves across sessions
+- [x] Configurable listing order: Windows-style folders-first or Linux-style mixed sorting by the selected column
 - [x] Drag and drop files from EdenExplorer into native Operating System (Windows) objects (Desktop, File Explorer, applications, etc.)
 - [x] Full navigation history is saved and restored with Back/Forward/Up buttons
 - [x] Added English, Indonesian, Japanese, and multi-Chinese language support

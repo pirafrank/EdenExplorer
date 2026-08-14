@@ -105,6 +105,7 @@ impl Default for MainWindow {
             time_format_24h,
             sort_column,
             sort_ascending,
+            listing_order,
             language,
             date_style,
             item_viewer_file_column_order,
@@ -123,6 +124,7 @@ impl Default for MainWindow {
             date_style,
             sort_column,
             sort_ascending,
+            listing_order,
             language,
             item_viewer_file_column_order,
             item_viewer_drive_column_order,
@@ -408,6 +410,7 @@ impl eframe::App for MainWindow {
                         self.settings_window.current_settings.time_format_24h,
                         self.settings_window.current_settings.sort_column,
                         self.settings_window.current_settings.sort_ascending,
+                        self.settings_window.current_settings.listing_order,
                         &self.settings_window.current_settings.language,
                         self.settings_window.current_settings.date_style,
                         &self

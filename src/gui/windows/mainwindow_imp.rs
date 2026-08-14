@@ -226,6 +226,7 @@ impl MainWindow {
         };
 
         // Update settings window with new sorting values (the default new tabs start with)
+        let listing_order = self.settings_window.current_settings.listing_order;
         self.settings_window.current_settings.sort_column = sort_column;
         self.settings_window.current_settings.sort_ascending = sort_ascending;
 
@@ -233,6 +234,7 @@ impl MainWindow {
             &mut self.active_tab_mut().view_mut(side).files,
             sort_column,
             sort_ascending,
+            listing_order,
         );
 
         // Automatically save settings when sorting changes
@@ -261,6 +263,7 @@ impl MainWindow {
             self.settings_window.current_settings.time_format_24h,
             self.settings_window.current_settings.sort_column,
             self.settings_window.current_settings.sort_ascending,
+            self.settings_window.current_settings.listing_order,
             &self.settings_window.current_settings.language,
             self.settings_window.current_settings.date_style,
             &self
@@ -333,6 +336,7 @@ impl MainWindow {
     }
 
     pub(crate) fn load_view(&mut self, side: SplitSide) {
+        let listing_order = self.settings_window.current_settings.listing_order;
         let (sort_column, sort_ascending, current_path, is_root) = {
             let view = self.active_tab().view(side);
             (
@@ -393,7 +397,7 @@ impl MainWindow {
                 }
             }
 
-            sort_files(&mut view.files, sort_column, sort_ascending);
+            sort_files(&mut view.files, sort_column, sort_ascending, listing_order);
             return;
         }
 
@@ -566,9 +570,10 @@ impl MainWindow {
             CoTaskMemFree(Some(recycle_pidl as _));
         }
 
+        let listing_order = self.settings_window.current_settings.listing_order;
         let view = self.active_tab_mut().view_mut(side);
         view.files = recycle_items;
-        sort_files(&mut view.files, sort_column, sort_ascending);
+        sort_files(&mut view.files, sort_column, sort_ascending, listing_order);
     }
 
     pub fn create_new_folder(&mut self) {
@@ -1132,12 +1137,27 @@ impl MainWindow {
         }
     }
 
+    fn resort_all_views(&mut self) {
+        let listing_order = self.settings_window.current_settings.listing_order;
+        for tab in &mut self.tabs {
+            for view in std::iter::once(&mut tab.primary_view).chain(tab.split_view.iter_mut()) {
+                sort_files(
+                    &mut view.files,
+                    view.sort_column,
+                    view.sort_ascending,
+                    listing_order,
+                );
+            }
+        }
+    }
+
     pub fn handle_draw_settings_window(&mut self, ctx: &egui::Context, palette: &ThemePalette) {
         if let Some(action) =
             draw_settings_window(ctx, &mut self.settings_window, &mut self.i18n, palette)
         {
             match action {
                 SettingsAction::ApplySettings => {
+                    self.resort_all_views();
                     self.save_app_settings_to_disk();
 
                     if let Some(hwnd) = self.hwnd {
@@ -1149,6 +1169,8 @@ impl MainWindow {
                 }
                 SettingsAction::ResetToDefaults => {
                     self.settings_window.current_settings = Default::default();
+                    self.resort_all_views();
+                    self.save_app_settings_to_disk();
                     if let Some(hwnd) = self.hwnd {
                         crate::gui::windows::windowsoverrides::set_window_mode(
                             hwnd,
@@ -1351,6 +1373,7 @@ impl MainWindow {
                         _time_format_24h,
                         _sort_column,
                         _sort_ascending,
+                        _listing_order,
                         _language,
                         _date_style,
                         _item_viewer_file_column_order,
@@ -1851,12 +1874,13 @@ impl MainWindow {
         }
 
         if updated {
+            let listing_order = self.settings_window.current_settings.listing_order;
             let (sort_column, sort_ascending) = {
                 let view = self.active_tab().view(side);
                 (view.sort_column, view.sort_ascending)
             };
             let view = self.active_tab_mut().view_mut(side);
-            sort_files(&mut view.files, sort_column, sort_ascending);
+            sort_files(&mut view.files, sort_column, sort_ascending, listing_order);
         }
         updated
     }
@@ -1896,6 +1920,7 @@ impl MainWindow {
         }
 
         if !batch.is_empty() {
+            let listing_order = self.settings_window.current_settings.listing_order;
             let folder_scanning_enabled = self
                 .settings_window
                 .current_settings
@@ -1922,7 +1947,7 @@ impl MainWindow {
             };
             let view = self.active_tab_mut().view_mut(side);
             view.files.extend(batch);
-            sort_files(&mut view.files, sort_column, sort_ascending);
+            sort_files(&mut view.files, sort_column, sort_ascending, listing_order);
             any_change = true;
         }
 

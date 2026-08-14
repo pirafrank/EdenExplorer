@@ -174,3 +174,7 @@ launch-window-not-ready =
     The running EdenExplorer window was not ready.
 launch-window-rejected = 
     The running EdenExplorer window did not accept the request.
+
+settings_listing_order = Listing order
+settings_listing_order_windows = Windows style (folders first)
+settings_listing_order_linux = Linux style (mixed by selected column)
