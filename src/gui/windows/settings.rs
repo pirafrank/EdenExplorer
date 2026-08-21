@@ -231,6 +231,12 @@ pub fn draw_settings_window(
                         if eden_button(ui, palette, &i18n.tr("settings_reset")).clicked() {
                             action = Some(SettingsAction::ResetToDefaults);
                         }
+                        if eden_button(ui, palette, &i18n.tr("settings_open_file"))
+                            .on_hover_text(i18n.tr("tooltip_settings_open_file"))
+                            .clicked()
+                        {
+                            action = Some(SettingsAction::OpenSettingsFile);
+                        }
                     });
                     ui.group(|ui| {
                         let language_label = i18n.tr("language");

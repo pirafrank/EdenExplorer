@@ -444,6 +444,12 @@ pub fn draw_theme_customizer(
                         customizer.selected_mode,
                     ));
                 }
+                if eden_button(ui, palette, &i18n.tr("theme_open_file"))
+                    .on_hover_text(i18n.tr("tooltip_theme_open_file"))
+                    .clicked()
+                {
+                    action = Some(ThemeCustomizerAction::OpenThemeFile);
+                }
             });
 
             if changed && action.is_none() {

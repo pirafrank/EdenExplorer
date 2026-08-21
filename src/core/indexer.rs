@@ -4,7 +4,8 @@ use crate::gui::windows::containers::enums::ItemViewerHeaderColumn;
 use crate::gui::windows::structs::AppSettings;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io;
+use std::fs::OpenOptions;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 pub const CONFIG_VERSION: u32 = 1;
@@ -237,10 +238,10 @@ fn base_dir() -> Option<PathBuf> {
 fn path(name: &str) -> Option<PathBuf> {
     base_dir().map(|p| p.join(name))
 }
-fn settings_path() -> Option<PathBuf> {
+pub(crate) fn settings_path() -> Option<PathBuf> {
     path("settings.toml")
 }
-fn theme_path() -> Option<PathBuf> {
+pub(crate) fn theme_path() -> Option<PathBuf> {
     path("theme.toml")
 }
 fn tags_path() -> Option<PathBuf> {
@@ -282,6 +283,124 @@ fn atomic_write(path: &Path, contents: &[u8]) -> Result<(), SettingsError> {
             Err(error.into())
         }
     }
+}
+
+fn create_if_missing(path: &Path, contents: &[u8]) -> Result<(), SettingsError> {
+    if path.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let temporary_path = path.with_extension(format!(
+        "{}.{}.tmp",
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("toml"),
+        std::process::id()
+    ));
+    let mut file = match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary_path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            return Err(error.into());
+        }
+        Err(error) => return Err(error.into()),
+    };
+    if let Err(error) = file.write_all(contents).and_then(|_| file.flush()) {
+        let _ = fs::remove_file(&temporary_path);
+        return Err(error.into());
+    }
+    drop(file);
+
+    // Linking a fully written temporary file creates the destination without
+    // replacing it if another process won the race after the initial exists check.
+    let result = match fs::hard_link(&temporary_path, path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(error.into()),
+    };
+    let _ = fs::remove_file(&temporary_path);
+    result
+}
+
+fn commented_toml(serialized: &str, active_sections: &[&str]) -> String {
+    serialized
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim();
+            let active_section = trimmed
+                .strip_prefix('[')
+                .and_then(|section| section.strip_suffix(']'))
+                .is_some_and(|section| active_sections.contains(&section));
+            if trimmed.is_empty() || active_section {
+                line.to_string()
+            } else {
+                format!("# {line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub(crate) fn settings_template() -> Result<String, SettingsError> {
+    let defaults = AppSettings::default();
+    let serialized = toml::to_string_pretty(&defaults)
+        .map_err(|error| SettingsError::Parse(error.to_string()))?;
+    let options = serialized
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("version ="))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(format!(
+        "# EdenExplorer application settings. Omitted fields use application defaults.\nversion = {CONFIG_VERSION}\n\n{}\n",
+        commented_toml(&options, &[])
+    ))
+}
+
+pub(crate) fn theme_template() -> Result<String, SettingsError> {
+    let mut root = toml::map::Map::new();
+    root.insert(
+        "version".into(),
+        toml::Value::Integer(CONFIG_VERSION as i64),
+    );
+    root.insert(
+        "light".into(),
+        toml::Value::try_from(get_default_palette(ThemeMode::Light))
+            .map_err(|error| SettingsError::Parse(error.to_string()))?,
+    );
+    root.insert(
+        "dark".into(),
+        toml::Value::try_from(get_default_palette(ThemeMode::Dark))
+            .map_err(|error| SettingsError::Parse(error.to_string()))?,
+    );
+    let serialized = toml::to_string_pretty(&toml::Value::Table(root))
+        .map_err(|error| SettingsError::Parse(error.to_string()))?;
+    let options = serialized
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("version ="))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(format!(
+        "# EdenExplorer theme overrides. Omitted fields use the selected palette's application defaults.\nversion = {CONFIG_VERSION}\n\n{}\n",
+        commented_toml(&options, &["light", "dark"])
+    ))
+}
+
+pub(crate) fn ensure_settings_file() -> Result<PathBuf, SettingsError> {
+    let path = settings_path().ok_or_else(|| SettingsError::Parse("no data directory".into()))?;
+    create_if_missing(&path, settings_template()?.as_bytes())?;
+    Ok(path)
+}
+
+pub(crate) fn ensure_theme_file() -> Result<PathBuf, SettingsError> {
+    let path = theme_path().ok_or_else(|| SettingsError::Parse("no data directory".into()))?;
+    create_if_missing(&path, theme_template()?.as_bytes())?;
+    Ok(path)
 }
 fn backup(source: &Path) -> Result<(), SettingsError> {
     if !source.exists() {
@@ -610,5 +729,50 @@ mod tests {
         let tags: TagsDocument = toml::from_str("groups = []").unwrap();
         assert_eq!(favorites.version, CONFIG_VERSION);
         assert_eq!(tags.version, CONFIG_VERSION);
+    }
+
+    #[test]
+    fn settings_template_is_valid_and_keeps_options_commented() {
+        let template = settings_template().unwrap();
+        let parsed: AppSettings = toml::from_str(&template).unwrap();
+        assert_eq!(parsed, AppSettings::default());
+        assert!(template.contains("version = 1"));
+        assert!(template.contains("# folder_scanning_enabled = true"));
+        assert!(!template.contains("\nfolder_scanning_enabled ="));
+    }
+
+    #[test]
+    fn theme_template_is_valid_and_resolves_to_defaults() {
+        let template = theme_template().unwrap();
+        let value: toml::Value = toml::from_str(&template).unwrap();
+        assert_eq!(
+            value.get("version").and_then(toml::Value::as_integer),
+            Some(1)
+        );
+        assert!(value.get("light").is_some());
+        assert!(value.get("dark").is_some());
+        assert!(template.contains("# text_size = 12.0"));
+        assert!(!template.contains("\ntext_size ="));
+        let light = overlay_palette(ThemeMode::Light, value.get("light")).unwrap();
+        let dark = overlay_palette(ThemeMode::Dark, value.get("dark")).unwrap();
+        assert_eq!(
+            toml::Value::try_from(light).unwrap(),
+            toml::Value::try_from(get_default_palette(ThemeMode::Light)).unwrap()
+        );
+        assert_eq!(
+            toml::Value::try_from(dark).unwrap(),
+            toml::Value::try_from(get_default_palette(ThemeMode::Dark)).unwrap()
+        );
+    }
+
+    #[test]
+    fn create_if_missing_does_not_modify_existing_file() {
+        let path =
+            std::env::temp_dir().join(format!("eden-explorer-test-{}.toml", std::process::id()));
+        let _ = fs::remove_file(&path);
+        fs::write(&path, "user content\n").unwrap();
+        create_if_missing(&path, b"replacement\n").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "user content\n");
+        let _ = fs::remove_file(&path);
     }
 }

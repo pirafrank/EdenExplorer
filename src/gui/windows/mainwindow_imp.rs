@@ -2,7 +2,8 @@ use crate::core::drives::{get_drive_infos, is_raw_physical_drive_path};
 use crate::core::fs::{FileItem, get_shell_item_metadata};
 use crate::core::fs::{MY_RECYCLE_BIN_PATH, parallel_directory_scan, scan_dir_async};
 use crate::core::indexer::{
-    load_app_settings, save_app_settings, save_favorites, save_tags, save_theme_settings,
+    ensure_settings_file, ensure_theme_file, load_app_settings, save_app_settings, save_favorites,
+    save_tags, save_theme_settings,
 };
 use crate::gui::MainWindow;
 use crate::gui::i18n::I18n;
@@ -48,6 +49,29 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 use windows::core::{Error, HRESULT};
 
 use windows::{Win32::System::Com::*, Win32::UI::Shell::*, core::*};
+
+fn open_path_with_default_application(path: &Path) -> std::result::Result<(), String> {
+    let path_string = path.to_string_lossy();
+    let wide_path: Vec<u16> = OsStr::new(path_string.as_ref())
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        let result = ShellExecuteW(
+            None,
+            PCWSTR::null(),
+            PCWSTR(wide_path.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+        if result.0 <= std::ptr::null_mut() {
+            Err(format!("ShellExecuteW failed for {}", path.display()))
+        } else {
+            Ok(())
+        }
+    }
+}
 
 impl Drop for MainWindow {
     fn drop(&mut self) {
@@ -1148,6 +1172,14 @@ impl MainWindow {
                 SettingsAction::ResetFavourites => {
                     self.sidebar_state.favorites = self.default_favorites();
                     self.persist_favorites();
+                }
+                SettingsAction::OpenSettingsFile => {
+                    if let Err(error) = ensure_settings_file()
+                        .map_err(|error| error.to_string())
+                        .and_then(|path| open_path_with_default_application(&path))
+                    {
+                        eprintln!("Unable to open settings.toml: {error}");
+                    }
                 }
             }
         }
@@ -2361,25 +2393,8 @@ pub fn handle_pending_actions(pending_action: Option<ItemViewerAction>, explorer
             }
             ItemViewerAction::OpenWithDefault(paths) => {
                 for path in paths {
-                    let path_str = path.to_string_lossy().to_string();
-                    let wide_path: Vec<u16> = OsStr::new(&path_str)
-                        .encode_wide()
-                        .chain(std::iter::once(0))
-                        .collect();
-
-                    unsafe {
-                        let result = ShellExecuteW(
-                            None,
-                            PCWSTR::null(),
-                            PCWSTR(wide_path.as_ptr()),
-                            PCWSTR::null(),
-                            PCWSTR::null(),
-                            SW_SHOWNORMAL,
-                        );
-
-                        if result.0 <= std::ptr::null_mut() {
-                            eprintln!("Failed to open file: {}", path.display());
-                        }
+                    if let Err(error) = open_path_with_default_application(&path) {
+                        eprintln!("Failed to open file: {error}");
                     }
                 }
             }
@@ -2627,6 +2642,14 @@ pub fn handle_draw_customizetheme_window(
                             }
                         }
                     }
+                }
+            }
+            ThemeCustomizerAction::OpenThemeFile => {
+                if let Err(error) = ensure_theme_file()
+                    .map_err(|error| error.to_string())
+                    .and_then(|path| open_path_with_default_application(&path))
+                {
+                    eprintln!("Unable to open theme.toml: {error}");
                 }
             }
         }

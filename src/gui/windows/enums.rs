@@ -4,6 +4,7 @@ pub enum ThemeCustomizerAction {
     ResetToDefaults(crate::gui::theme::ThemeMode),
     ExportTheme(crate::gui::theme::ThemeMode),
     ImportTheme(crate::gui::theme::ThemeMode),
+    OpenThemeFile,
 }
 
 #[derive(Clone, Debug)]
@@ -11,4 +12,5 @@ pub enum SettingsAction {
     ResetToDefaults,
     ResetFavourites,
     ApplySettings,
+    OpenSettingsFile,
 }
