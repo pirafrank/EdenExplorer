@@ -38,8 +38,11 @@ pub struct Navigation {
     pub forward: Vec<PathBuf>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct AppSettings {
+    #[serde(default = "crate::core::indexer::default_config_version")]
+    pub version: u32,
     pub folder_scanning_enabled: bool,
     pub show_hidden_files_folders: bool,
     pub show_item_viewer_icons: bool,
@@ -58,6 +61,50 @@ pub struct AppSettings {
     pub item_viewer_file_column_sizes: Vec<f32>,
     pub item_viewer_drive_column_sizes: Vec<f32>,
     pub recycle_bin_column_sizes: Vec<f32>,
+    pub theme: ThemeMode,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            version: crate::core::indexer::CONFIG_VERSION,
+            folder_scanning_enabled: true,
+            show_hidden_files_folders: true,
+            show_item_viewer_icons: true,
+            windows_context_menu_enabled: false,
+            start_path: Some(PathBuf::from(crate::core::fs::MY_PC_PATH)),
+            window_size_mode: WindowSizeMode::default(),
+            pinned_tabs: Vec::new(),
+            time_format_24h: false,
+            date_style: crate::core::fs::DateStyle::default(),
+            sort_column: SortColumn::Name,
+            sort_ascending: true,
+            language: "en-US".to_string(),
+            item_viewer_file_column_order: vec![
+                ItemViewerHeaderColumn::Type,
+                ItemViewerHeaderColumn::Size,
+                ItemViewerHeaderColumn::Modified,
+                ItemViewerHeaderColumn::Created,
+            ],
+            item_viewer_drive_column_order: vec![
+                ItemViewerHeaderColumn::Type,
+                ItemViewerHeaderColumn::Size,
+                ItemViewerHeaderColumn::Usage,
+            ],
+            recycle_bin_column_order: vec![
+                ItemViewerHeaderColumn::Type,
+                ItemViewerHeaderColumn::Size,
+                ItemViewerHeaderColumn::Deleted,
+                ItemViewerHeaderColumn::Created,
+            ],
+            item_viewer_file_column_sizes:
+                crate::core::indexer::default_item_viewer_file_column_size(),
+            item_viewer_drive_column_sizes:
+                crate::core::indexer::default_item_viewer_drive_column_size(),
+            recycle_bin_column_sizes: crate::core::indexer::default_recycle_bin_column_size(),
+            theme: ThemeMode::default(),
+        }
+    }
 }
 
 #[derive(Default)]

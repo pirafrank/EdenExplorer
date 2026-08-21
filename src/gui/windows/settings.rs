@@ -7,10 +7,8 @@ use crate::core::{
 };
 use crate::gui::i18n::I18n;
 use crate::gui::theme::ThemePalette;
-use crate::gui::utils::SortColumn;
-use crate::gui::windows::containers::enums::ItemViewerHeaderColumn;
 use crate::gui::windows::enums::SettingsAction;
-use crate::gui::windows::structs::{AppSettings, SettingsWindow};
+use crate::gui::windows::structs::SettingsWindow;
 use eframe::egui;
 use egui::RichText;
 use egui_phosphor::regular;
@@ -18,45 +16,6 @@ use std::path::PathBuf;
 
 const SETTINGS_COMBO_WIDTH: f32 = 180.0;
 const SETTINGS_VALUE_WIDTH: f32 = 92.0;
-
-impl Default for AppSettings {
-    fn default() -> Self {
-        Self {
-            folder_scanning_enabled: true,
-            show_hidden_files_folders: true,
-            show_item_viewer_icons: true,
-            windows_context_menu_enabled: false,
-            start_path: Some(PathBuf::from(MY_PC_PATH)),
-            window_size_mode: WindowSizeMode::default(),
-            pinned_tabs: Vec::new(),
-            time_format_24h: false,
-            date_style: DateStyle::default(),
-            sort_column: SortColumn::Name,
-            sort_ascending: true,
-            language: "en-US".to_string(),
-            item_viewer_file_column_order: vec![
-                ItemViewerHeaderColumn::Type,
-                ItemViewerHeaderColumn::Size,
-                ItemViewerHeaderColumn::Modified,
-                ItemViewerHeaderColumn::Created,
-            ],
-            item_viewer_drive_column_order: vec![
-                ItemViewerHeaderColumn::Type,
-                ItemViewerHeaderColumn::Size,
-                ItemViewerHeaderColumn::Usage,
-            ],
-            recycle_bin_column_order: vec![
-                ItemViewerHeaderColumn::Type,
-                ItemViewerHeaderColumn::Size,
-                ItemViewerHeaderColumn::Deleted,
-                ItemViewerHeaderColumn::Created,
-            ],
-            item_viewer_file_column_sizes: vec![],
-            item_viewer_drive_column_sizes: vec![],
-            recycle_bin_column_sizes: vec![],
-        }
-    }
-}
 
 fn info_icon(ui: &mut egui::Ui, hover_text: &str, palette: &ThemePalette) -> egui::Response {
     let resp = ui.add(egui::Label::new(regular::QUESTION).sense(egui::Sense::hover()));

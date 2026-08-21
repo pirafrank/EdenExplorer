@@ -1,7 +1,5 @@
 use crate::core::indexer::WindowSizeMode;
-use crate::core::indexer::{
-    load_app_settings, load_favorites, load_tags, load_theme_settings, save_app_settings,
-};
+use crate::core::indexer::{load_app_settings, load_favorites, load_tags, load_theme_settings};
 use crate::core::launch::take_forwarded_paths;
 use crate::core::utils::tabs::update_tab_infos_cache;
 use crate::gui::dragdrop::{DragDropBackend, DropTargets};
@@ -93,48 +91,15 @@ pub struct MainWindow {
 
 impl Default for MainWindow {
     fn default() -> Self {
-        // Load saved settings
-        let (
-            folder_scanning_enabled,
-            show_hidden_files_folders,
-            show_item_viewer_icons,
-            windows_context_menu_enabled,
-            window_size_mode,
-            start_path,
-            saved_theme,
-            pinned_tabs,
-            time_format_24h,
-            sort_column,
-            sort_ascending,
-            language,
-            date_style,
-            item_viewer_file_column_order,
-            item_viewer_drive_column_order,
-            recycle_bin_column_order,
-            item_viewer_file_column_sizes,
-            item_viewer_drive_column_sizes,
-            recycle_bin_column_sizes,
-        ) = load_app_settings();
-        let loaded_settings = AppSettings {
-            folder_scanning_enabled,
-            show_hidden_files_folders,
-            show_item_viewer_icons,
-            windows_context_menu_enabled,
-            window_size_mode: window_size_mode.clone(),
-            start_path: Some(start_path.clone()), // important
-            pinned_tabs: pinned_tabs.clone(),
-            time_format_24h,
-            date_style,
-            sort_column,
-            sort_ascending,
-            language,
-            item_viewer_file_column_order,
-            item_viewer_drive_column_order,
-            recycle_bin_column_order,
-            item_viewer_file_column_sizes,
-            item_viewer_drive_column_sizes,
-            recycle_bin_column_sizes,
-        };
+        let loaded_settings = load_app_settings().unwrap_or_else(|error| {
+            eprintln!("Unable to load application settings: {error}");
+            AppSettings::default()
+        });
+        let start_path = loaded_settings
+            .start_path
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(crate::core::fs::MY_PC_PATH));
+        let pinned_tabs = loaded_settings.pinned_tabs.clone();
 
         let system_locale = sys_locale::get_locale().unwrap_or_else(|| "en-US".to_string());
 
@@ -203,10 +168,7 @@ impl Default for MainWindow {
             sidebar_state: SidebarState::default(),
 
             rename_state: None,
-            theme: match saved_theme.as_deref() {
-                Some("light") => ThemeMode::Light,
-                Some("dark") | _ => ThemeMode::Dark,
-            },
+            theme: loaded_settings.theme,
             display_file_explorer: true,
             sidebar_collapsed: false,
             theme_dirty: true,
@@ -215,9 +177,14 @@ impl Default for MainWindow {
             icon_cache: None,
 
             file_type_cache: HashMap::new(),
-            tags_state: load_tags()
-                .map(TagsState::from_snapshot)
-                .unwrap_or_default(),
+            tags_state: match load_tags() {
+                Ok(Some(snapshot)) => TagsState::from_snapshot(snapshot),
+                Ok(None) => TagsState::default(),
+                Err(error) => {
+                    eprintln!("Unable to load tags: {error}");
+                    TagsState::default()
+                }
+            },
             theme_customizer: Default::default(),
             settings_window: Default::default(),
             about_window: Default::default(),
@@ -249,11 +216,19 @@ impl Default for MainWindow {
         app.settings_window.current_settings = loaded_settings;
 
         match load_theme_settings() {
-            Some((light, dark)) => {
+            Ok(Some((light, dark))) => {
                 set_palette(ThemeMode::Light, light);
                 set_palette(ThemeMode::Dark, dark);
             }
-            None => {
+            Ok(None) => {
+                let light = get_default_palette(ThemeMode::Light);
+                let dark = get_default_palette(ThemeMode::Dark);
+
+                set_palette(ThemeMode::Light, light);
+                set_palette(ThemeMode::Dark, dark);
+            }
+            Err(error) => {
+                eprintln!("Unable to load theme: {error}");
                 let light = get_default_palette(ThemeMode::Light);
                 let dark = get_default_palette(ThemeMode::Dark);
 
@@ -264,11 +239,14 @@ impl Default for MainWindow {
 
         app.theme_customizer.light_palette = get_palette(ThemeMode::Light);
         app.theme_customizer.dark_palette = get_palette(ThemeMode::Dark);
-        let stored = load_favorites('C');
-        if stored.is_empty() {
-            app.sidebar_state.favorites = app.default_favorites();
-            app.persist_favorites();
-        } else {
+        let (stored, favorites_load_failed) = match load_favorites('C') {
+            Ok(stored) => (stored, false),
+            Err(error) => {
+                eprintln!("Unable to load favorites: {error}");
+                (None, true)
+            }
+        };
+        if let Some(stored) = stored {
             app.sidebar_state.favorites = stored
                 .into_iter()
                 .map(|path| {
@@ -280,6 +258,11 @@ impl Default for MainWindow {
                     FavoriteItem { path, label }
                 })
                 .collect();
+        } else if !favorites_load_failed {
+            app.sidebar_state.favorites = app.default_favorites();
+            app.persist_favorites();
+        } else {
+            app.sidebar_state.favorites = Vec::new();
         }
         app.load_path();
         app
@@ -401,55 +384,7 @@ impl eframe::App for MainWindow {
                         }
                     }
 
-                    // Save the updated settings
-                    save_app_settings(
-                        self.settings_window
-                            .current_settings
-                            .folder_scanning_enabled,
-                        self.settings_window
-                            .current_settings
-                            .show_hidden_files_folders,
-                        self.settings_window.current_settings.show_item_viewer_icons,
-                        self.settings_window
-                            .current_settings
-                            .windows_context_menu_enabled,
-                        &self.settings_window.current_settings.window_size_mode,
-                        &self.settings_window.current_settings.start_path,
-                        Some(match self.theme {
-                            crate::gui::theme::ThemeMode::Dark => "dark",
-                            crate::gui::theme::ThemeMode::Light => "light",
-                        }),
-                        &self.settings_window.current_settings.pinned_tabs,
-                        self.settings_window.current_settings.time_format_24h,
-                        self.settings_window.current_settings.sort_column,
-                        self.settings_window.current_settings.sort_ascending,
-                        &self.settings_window.current_settings.language,
-                        self.settings_window.current_settings.date_style,
-                        &self
-                            .settings_window
-                            .current_settings
-                            .item_viewer_file_column_order,
-                        &self
-                            .settings_window
-                            .current_settings
-                            .item_viewer_drive_column_order,
-                        &self
-                            .settings_window
-                            .current_settings
-                            .recycle_bin_column_order,
-                        &self
-                            .settings_window
-                            .current_settings
-                            .item_viewer_file_column_sizes,
-                        &self
-                            .settings_window
-                            .current_settings
-                            .item_viewer_drive_column_sizes,
-                        &self
-                            .settings_window
-                            .current_settings
-                            .recycle_bin_column_sizes,
-                    );
+                    self.save_app_settings_to_disk();
 
                     self.last_window_size = Some(current_size);
                 }

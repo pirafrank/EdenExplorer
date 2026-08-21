@@ -251,55 +251,12 @@ impl MainWindow {
         self.save_app_settings_to_disk();
     }
 
-    fn save_app_settings_to_disk(&self) {
-        save_app_settings(
-            self.settings_window
-                .current_settings
-                .folder_scanning_enabled,
-            self.settings_window
-                .current_settings
-                .show_hidden_files_folders,
-            self.settings_window.current_settings.show_item_viewer_icons,
-            self.settings_window
-                .current_settings
-                .windows_context_menu_enabled,
-            &self.settings_window.current_settings.window_size_mode,
-            &self.settings_window.current_settings.start_path,
-            Some(match self.theme {
-                ThemeMode::Dark => "dark",
-                ThemeMode::Light => "light",
-            }),
-            &self.settings_window.current_settings.pinned_tabs,
-            self.settings_window.current_settings.time_format_24h,
-            self.settings_window.current_settings.sort_column,
-            self.settings_window.current_settings.sort_ascending,
-            &self.settings_window.current_settings.language,
-            self.settings_window.current_settings.date_style,
-            &self
-                .settings_window
-                .current_settings
-                .item_viewer_file_column_order,
-            &self
-                .settings_window
-                .current_settings
-                .item_viewer_drive_column_order,
-            &self
-                .settings_window
-                .current_settings
-                .recycle_bin_column_order,
-            &self
-                .settings_window
-                .current_settings
-                .item_viewer_file_column_sizes,
-            &self
-                .settings_window
-                .current_settings
-                .item_viewer_drive_column_sizes,
-            &self
-                .settings_window
-                .current_settings
-                .recycle_bin_column_sizes,
-        );
+    pub(crate) fn save_app_settings_to_disk(&self) {
+        let mut settings = self.settings_window.current_settings.clone();
+        settings.theme = self.theme;
+        if let Err(error) = save_app_settings(&settings) {
+            eprintln!("Unable to save application settings: {error}");
+        }
     }
 
     fn apply_item_viewer_column_order(
@@ -739,11 +696,15 @@ impl MainWindow {
             .iter()
             .map(|fav| fav.path.display().to_string())
             .collect();
-        save_favorites('C', &items);
+        if let Err(error) = save_favorites('C', &items) {
+            eprintln!("Unable to save favorites: {error}");
+        }
     }
 
     pub fn persist_tags(&self) {
-        save_tags(&self.tags_state.to_snapshot());
+        if let Err(error) = save_tags(&self.tags_state.to_snapshot()) {
+            eprintln!("Unable to save tags: {error}");
+        }
     }
 
     fn move_tagged_paths_to_dir(&mut self, sources: &[PathBuf], target_dir: &Path) -> bool {
@@ -1367,27 +1328,16 @@ impl MainWindow {
                         self.load_path();
                     }
                 } else {
-                    let (
-                        _folder_scanning_enabled,
-                        _show_hidden_files_folders,
-                        _show_item_viewer_icons,
-                        _windows_context_menu_enabled,
-                        _window_size_mode,
-                        start_path,
-                        _saved_theme,
-                        _pinned_tabs,
-                        _time_format_24h,
-                        _sort_column,
-                        _sort_ascending,
-                        _language,
-                        _date_style,
-                        _item_viewer_file_column_order,
-                        _item_viewer_drive_column_order,
-                        _recycle_bin_column_order,
-                        _item_viewer_file_column_sizes,
-                        _item_viewer_drive_column_sizes,
-                        _recycle_bin_column_sizes,
-                    ) = load_app_settings();
+                    let start_path = load_app_settings()
+                        .map(|settings| {
+                            settings
+                                .start_path
+                                .unwrap_or_else(|| PathBuf::from(crate::core::fs::MY_PC_PATH))
+                        })
+                        .unwrap_or_else(|error| {
+                            eprintln!("Unable to reload application settings: {error}");
+                            PathBuf::from(crate::core::fs::MY_PC_PATH)
+                        });
                     self.tabs[0].primary_view.nav = Navigation::new(start_path);
                     self.tabs[0].split_view = None;
                     self.active_tab = 0;
@@ -2603,7 +2553,7 @@ pub fn handle_draw_customizetheme_window(
                 };
                 apply_font_to_context(ctx, &updated);
                 set_palette(mode, updated);
-                save_theme_settings(
+                let _ = save_theme_settings(
                     &theme_customizer.light_palette,
                     &theme_customizer.dark_palette,
                 );
@@ -2622,7 +2572,7 @@ pub fn handle_draw_customizetheme_window(
                     apply_font_to_context(ctx, &default);
                 }
                 set_palette(mode, default);
-                save_theme_settings(
+                let _ = save_theme_settings(
                     &theme_customizer.light_palette,
                     &theme_customizer.dark_palette,
                 );
@@ -2667,7 +2617,7 @@ pub fn handle_draw_customizetheme_window(
                                 apply_font_to_context(ctx, &imported);
                             }
                             set_palette(mode, imported);
-                            save_theme_settings(
+                            let _ = save_theme_settings(
                                 &theme_customizer.light_palette,
                                 &theme_customizer.dark_palette,
                             );

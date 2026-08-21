@@ -88,50 +88,13 @@ fn save_manual_window_size(hwnd: HWND) {
             return;
         }
 
-        let (
-            folder_scanning_enabled,
-            show_hidden_files_folders,
-            show_item_viewer_icons,
-            windows_context_menu_enabled,
-            _window_size_mode,
-            start_path,
-            saved_theme,
-            pinned_tabs,
-            time_format_24h,
-            sort_column,
-            sort_ascending,
-            _language,
-            date_style,
-            item_viewer_file_column_order,
-            item_viewer_drive_column_order,
-            recycle_bin_column_order,
-            item_viewer_file_column_sizes,
-            item_viewer_drive_column_sizes,
-            recycle_bin_column_sizes,
-        ) = load_app_settings();
-        let window_size_mode = WindowSizeMode::Custom { width, height };
-
-        save_app_settings(
-            folder_scanning_enabled,
-            show_hidden_files_folders,
-            show_item_viewer_icons,
-            windows_context_menu_enabled,
-            &window_size_mode,
-            &Some(start_path),
-            saved_theme.as_deref(),
-            &pinned_tabs,
-            time_format_24h,
-            sort_column,
-            sort_ascending,
-            &_language,
-            date_style,
-            &item_viewer_file_column_order,
-            &item_viewer_drive_column_order,
-            &recycle_bin_column_order,
-            &item_viewer_file_column_sizes,
-            &item_viewer_drive_column_sizes,
-            &recycle_bin_column_sizes,
-        );
+        let Ok(mut settings) = load_app_settings() else {
+            return;
+        };
+        settings.window_size_mode = WindowSizeMode::Custom { width, height };
+        if let Err(error) = save_app_settings(&settings) {
+            eprintln!("Unable to save window size: {error}");
+        }
     }
 }
 

@@ -238,6 +238,52 @@
 </tr>
 </table>
 
+## Configuration files
+
+EdenExplorer stores versioned TOML in its local application-data directory:
+
+```text
+ExplorerEden/
+  settings.toml
+  theme.toml
+  tags.toml
+  favorites/drive_C.toml
+```
+
+All documents use `version = 1`; a missing version is treated as version 1 where compatible. Unknown fields are ignored, omitted fields receive application defaults, and full saves normalize the effective document. Representative formats:
+
+```toml
+# settings.toml
+version = 1
+folder_scanning_enabled = true
+start_path = "C:\\Users\\example"
+theme = "Dark"
+```
+
+```toml
+# theme.toml
+version = 1
+[light]
+text_size = 12.0
+[dark]
+text_size = 12.0
+```
+
+```toml
+# favorites/drive_C.toml
+version = 1
+favorites = ["C:\\Users\\example\\Documents"]
+```
+
+```toml
+# tags.toml
+version = 1
+next_group_id = 2
+groups = [{ id = 1, name = "Work", color = [110, 85, 160, 255], items = ["C:\\Work\\plan.txt"] }]
+```
+
+Writes use a temporary file before replacement. Successful binary migrations retain the source as `.bin.bak`; backups are not overwritten. Existing TOML takes precedence over binary data, including invalid TOML, and each document is saved independently. Favorites remain isolated per drive.
+
 ## 🗺️ Roadmap
 
 ### ✅ Implemented Features
