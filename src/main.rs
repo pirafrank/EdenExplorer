@@ -5,6 +5,7 @@ mod gui;
 use crate::core::indexer::{WindowSizeMode, load_windows_size_mode_on_start};
 use crate::core::launch::{LaunchError, acquire_or_forward, existing_directories, parse_args};
 use crate::core::utils::fonts::apply_custom_font_definitions;
+use crate::gui::windows::rendering::select_renderer;
 use crate::gui::windows::windowsoverrides::set_egui_ctx;
 use eframe::{NativeOptions, egui};
 use std::os::windows::ffi::OsStrExt;
@@ -63,7 +64,7 @@ fn main() -> eframe::Result<()> {
     let pos_x = ((screen_w - window_size.x) * 0.5).max(0.0);
     let pos_y = ((screen_h - window_size.y) * 0.5).max(0.0);
 
-    let options = NativeOptions {
+    let mut options = NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size(window_size)
             .with_position(egui::pos2(pos_x, pos_y))
@@ -73,11 +74,24 @@ fn main() -> eframe::Result<()> {
             .with_clamp_size_to_monitor_size(true),
         ..Default::default()
     };
+    let renderer_selection = select_renderer();
+    options.renderer = renderer_selection.renderer();
 
+    let result = run_native(options.clone(), launch_paths.clone());
+    if result.is_err() && renderer_selection.can_fallback() {
+        eprintln!("EdenExplorer: wgpu initialization failed; retrying with glow");
+        options.renderer = eframe::Renderer::Glow;
+        run_native(options, launch_paths)
+    } else {
+        result
+    }
+}
+
+fn run_native(options: NativeOptions, launch_paths: Vec<std::path::PathBuf>) -> eframe::Result<()> {
     eframe::run_native(
         "EdenExplorer",
         options,
-        Box::new(|cc| {
+        Box::new(move |cc| {
             let mut fonts = egui::FontDefinitions::default();
 
             apply_custom_font_definitions(&mut fonts);
@@ -85,9 +99,7 @@ fn main() -> eframe::Result<()> {
             cc.egui_ctx.set_fonts(fonts);
             set_egui_ctx(&cc.egui_ctx);
 
-            Ok(Box::new(gui::MainWindow::new_with_paths(
-                launch_paths.clone(),
-            )))
+            Ok(Box::new(gui::MainWindow::new_with_paths(launch_paths)))
         }),
     )
 }

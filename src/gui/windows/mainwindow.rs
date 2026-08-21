@@ -25,6 +25,7 @@ use crate::gui::windows::containers::topbar::draw_topbar;
 use crate::gui::windows::mainwindow_imp::{
     handle_draw_customizetheme_window, handle_pending_actions,
 };
+use crate::gui::windows::rendering::{begin_ui, record_region, record_rendered_frame};
 use crate::gui::windows::structs::{
     AboutWindow, AppSettings, Navigation, SettingsWindow, SidebarState, ThemeCustomizer,
 };
@@ -310,6 +311,8 @@ impl MainWindow {
 
 impl eframe::App for MainWindow {
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        let _ui_timing = begin_ui();
+        record_rendered_frame();
         {
             let forwarded_paths = take_forwarded_paths();
             for path in &forwarded_paths {
@@ -529,6 +532,7 @@ impl eframe::App for MainWindow {
                             |ui| {
                                 egui::Frame::NONE.show(ui, |ui| {
                                     ui.add_space(8.0);
+                                    let region_start = std::time::Instant::now();
                                     topbar_action = Some(draw_topbar(
                                         ui,
                                         &self.i18n,
@@ -539,9 +543,11 @@ impl eframe::App for MainWindow {
                                         &palette,
                                         has_split,
                                     ));
+                                    record_region("topbar", region_start.elapsed());
                                 });
                                 if !self.sidebar_collapsed {
                                     sidebar_frame.show(ui, |ui| {
+                                        let region_start = std::time::Instant::now();
                                         sidebar_action = Some(draw_sidebar(
                                             ui,
                                             &self.i18n,
@@ -551,6 +557,7 @@ impl eframe::App for MainWindow {
                                             drag_active,
                                             drag_hover_target.clone(),
                                         ));
+                                        record_region("sidebar", region_start.elapsed());
                                     });
                                 }
                             },
@@ -631,6 +638,7 @@ impl eframe::App for MainWindow {
                                         ui.scope_builder(
                                             egui::UiBuilder::new().max_rect(tabs_rect),
                                             |ui| {
+                                                let region_start = std::time::Instant::now();
                                                 tabs_action = Some(draw_tabs(
                                                     ui,
                                                     &self.i18n,
@@ -643,6 +651,7 @@ impl eframe::App for MainWindow {
                                                     drag_active,
                                                     drag_hover_target.clone(),
                                                 ));
+                                                record_region("tabs", region_start.elapsed());
                                             },
                                         );
 
@@ -773,6 +782,7 @@ impl eframe::App for MainWindow {
                                                                             .nav
                                                                             .current
                                                                 });
+                                                            let region_start = std::time::Instant::now();
                                                             let (a, b) = draw_tab_content(
                                                                 ui,
                                                                 &self.i18n,
@@ -808,6 +818,7 @@ impl eframe::App for MainWindow {
                                                                 &mut drop_targets,
                                                                 primary_focused,
                                                             );
+                                                            record_region("item_viewer_primary", region_start.elapsed());
                                                             tabbar_action = a;
                                                             pending_action = b;
                                                         },
@@ -853,6 +864,7 @@ impl eframe::App for MainWindow {
                                                                         })
                                                                 })
                                                                 .unwrap_or(false);
+                                                            let region_start = std::time::Instant::now();
                                                             let (a, b) = draw_tab_content(
                                                                 ui,
                                                                 &self.i18n,
@@ -890,6 +902,7 @@ impl eframe::App for MainWindow {
                                                                 &mut drop_targets,
                                                                 secondary_focused,
                                                             );
+                                                            record_region("item_viewer_secondary", region_start.elapsed());
                                                             secondary_tabbar_action = a;
                                                             secondary_pending_action = b;
                                                         },
@@ -906,6 +919,7 @@ impl eframe::App for MainWindow {
                                                             .nav
                                                             .current
                                                 });
+                                            let region_start = std::time::Instant::now();
                                             let (a, b) = draw_tab_content(
                                                 ui,
                                                 &self.i18n,
@@ -940,6 +954,7 @@ impl eframe::App for MainWindow {
                                                 &mut drop_targets,
                                                 true,
                                             );
+                                            record_region("item_viewer", region_start.elapsed());
                                             tabbar_action = a;
                                             pending_action = b;
                                         }

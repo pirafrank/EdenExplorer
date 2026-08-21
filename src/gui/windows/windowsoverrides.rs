@@ -4,6 +4,7 @@ use crate::core::launch::receive_copydata;
 use crate::gui::i18n::I18n;
 use crate::gui::theme::ThemePalette;
 use crate::gui::utils::clickable_windows_icon;
+use crate::gui::windows::rendering::{record_repaint_request, record_viewport_event};
 use eframe::egui;
 use egui::Context;
 use egui_phosphor::regular;
@@ -59,6 +60,7 @@ pub fn set_egui_ctx(ctx: &Context) {
 }
 
 pub fn request_repaint() {
+    record_repaint_request();
     if let Ok(guard) = EGUI_CTX.read() {
         if let Some(ctx) = guard.as_ref() {
             ctx.request_repaint();
@@ -242,6 +244,12 @@ unsafe extern "system" fn custom_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    if matches!(
+        msg,
+        WM_MOVE | WM_SIZE | WM_WINDOWPOSCHANGED | WM_PAINT | WM_EXITSIZEMOVE
+    ) {
+        record_viewport_event();
+    }
     match msg {
         WM_COPYDATA => {
             if receive_copydata(lparam) {
