@@ -6,6 +6,11 @@ workstation runs; this checkout does not have access to those environments.
 
 ## Reproduction protocol
 
+The concise manual run sheet is in
+[`docs/performance-benchmark.md`](performance-benchmark.md). It records the
+environment, renderer, scenarios, CPU measurements, and diagnostic output
+needed for comparable workstation and RDP runs.
+
 Record the commit, Rust/Cargo versions, profile, executable size, dependency
 feature tree, Windows build, CPU count, GPU/display adapter, resolution, DPI,
 and whether the process is in a local console or RDP session. Use the same
@@ -36,6 +41,12 @@ requests, application frame callbacks, and selected window events. The frame
 counter is an application callback counter, not a claim that the backend
 presented a new image; eframe 0.35 does not expose a general present callback
 through `App`.
+
+When diagnostics are enabled, startup also enumerates the wgpu backends
+available to the process and logs each adapter's name, backend, device type,
+driver, and driver information. This is an adapter inventory for diagnosis;
+the adapter actually selected by eframe remains authoritative for the
+renderer run.
 
 ## Implementation findings
 
@@ -87,3 +98,8 @@ independently removable from the application dependency declaration.
 | Environment | Renderer | Scenario | CPU avg/peak | UI calls/ms | Repaints/frames | Result |
 |---|---|---|---:|---:|---:|---|
 | pending | wgpu/glow | idle/move/resize/scroll | pending | pending | pending | pending |
+
+The minimal native-decoration reproducer is built as
+`renderer_bench.exe` and is intentionally kept outside the normal application
+UI and window procedure. It is used to distinguish eframe/backend movement
+cost from EdenExplorer-specific custom chrome and repaint behavior.

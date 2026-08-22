@@ -20,6 +20,8 @@ image = "0.25.10"
 eframe = { version = "0.35.0", default-features = false, features = ["accesskit", "default_fonts", "glow", "wgpu"] }
 egui = { version = "0.35.0", features = ["serde"] }
 egui_extras = { version = "0.35.0", default-features = false }
+pollster = "0.4.0"
+wgpu = { version = "29.0.4", default-features = false, features = ["dx12", "gles", "vulkan"] }
 ntapi = "0.4.3"
 windows = { version = "0.62.2", features = [
     "Win32_Foundation",

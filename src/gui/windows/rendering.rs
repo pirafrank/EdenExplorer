@@ -40,6 +40,7 @@ pub fn select_renderer() -> RendererSelection {
             windows::Win32::UI::WindowsAndMessaging::SM_REMOTESESSION,
         ) != 0
     };
+    log_wgpu_adapters();
     let raw = std::env::var("EDEN_RENDERER").unwrap_or_else(|_| "auto".to_owned());
     let request = match raw.trim().to_ascii_lowercase().as_str() {
         "auto" | "" => RendererRequest::Auto,
@@ -71,6 +72,55 @@ pub fn select_renderer() -> RendererSelection {
         },
     );
     selection
+}
+
+pub fn native_chrome_requested() -> bool {
+    std::env::var("EDEN_NATIVE_CHROME")
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn log_wgpu_adapters() {
+    if !diagnostics_requested() {
+        return;
+    }
+
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+    let adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()));
+    if adapters.is_empty() {
+        eprintln!("EdenExplorer diagnostics: wgpu adapters=none");
+        return;
+    }
+
+    for adapter in adapters {
+        let info = adapter.get_info();
+        eprintln!(
+            "EdenExplorer diagnostics wgpu adapter: name={:?} backend={:?} device_type={:?} driver={:?} driver_info={:?} vendor=0x{:04x} device=0x{:04x}",
+            info.name,
+            info.backend,
+            info.device_type,
+            info.driver,
+            info.driver_info,
+            info.vendor,
+            info.device,
+        );
+    }
+}
+
+fn diagnostics_requested() -> bool {
+    std::env::var("EDEN_DIAGNOSTICS")
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
+        .unwrap_or(false)
 }
 
 static DIAGNOSTICS: AtomicU64 = AtomicU64::new(0);

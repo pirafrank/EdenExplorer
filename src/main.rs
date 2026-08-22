@@ -5,7 +5,7 @@ mod gui;
 use crate::core::indexer::{WindowSizeMode, load_windows_size_mode_on_start};
 use crate::core::launch::{LaunchError, acquire_or_forward, existing_directories, parse_args};
 use crate::core::utils::fonts::apply_custom_font_definitions;
-use crate::gui::windows::rendering::select_renderer;
+use crate::gui::windows::rendering::{native_chrome_requested, select_renderer};
 use crate::gui::windows::windowsoverrides::set_egui_ctx;
 use eframe::{NativeOptions, egui};
 use std::os::windows::ffi::OsStrExt;
@@ -64,13 +64,14 @@ fn main() -> eframe::Result<()> {
     let pos_x = ((screen_w - window_size.x) * 0.5).max(0.0);
     let pos_y = ((screen_h - window_size.y) * 0.5).max(0.0);
 
+    let native_chrome = native_chrome_requested();
     let mut options = NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size(window_size)
             .with_position(egui::pos2(pos_x, pos_y))
             .with_icon(icon)
-            .with_title_shown(false)
-            .with_decorations(false)
+            .with_title_shown(native_chrome)
+            .with_decorations(native_chrome)
             .with_clamp_size_to_monitor_size(true),
         ..Default::default()
     };

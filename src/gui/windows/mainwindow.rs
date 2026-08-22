@@ -25,7 +25,9 @@ use crate::gui::windows::containers::topbar::draw_topbar;
 use crate::gui::windows::mainwindow_imp::{
     handle_draw_customizetheme_window, handle_pending_actions,
 };
-use crate::gui::windows::rendering::{begin_ui, record_region, record_rendered_frame};
+use crate::gui::windows::rendering::{
+    begin_ui, native_chrome_requested, record_region, record_rendered_frame,
+};
 use crate::gui::windows::structs::{
     AboutWindow, AppSettings, Navigation, SettingsWindow, SidebarState, ThemeCustomizer,
 };
@@ -328,9 +330,11 @@ impl eframe::App for MainWindow {
             if let Some(hwnd) = crate::gui::windows::windowsoverrides::get_hwnd_from_frame(frame) {
                 self.hwnd = Some(hwnd);
 
-                unsafe {
-                    if let Err(e) = install_wndproc(hwnd) {
-                        eprintln!("Failed to install wndproc: {}", e);
+                if !native_chrome_requested() {
+                    unsafe {
+                        if let Err(e) = install_wndproc(hwnd) {
+                            eprintln!("Failed to install wndproc: {}", e);
+                        }
                     }
                 }
 
@@ -344,7 +348,9 @@ impl eframe::App for MainWindow {
 
         if !self.window_override_set {
             if let Some(hwnd) = self.hwnd {
-                apply_window_override(hwnd, &palette);
+                if !native_chrome_requested() {
+                    apply_window_override(hwnd, &palette);
+                }
                 self.window_override_set = true;
             }
         }
@@ -376,7 +382,9 @@ impl eframe::App for MainWindow {
         if self.theme_dirty {
             apply_theme(ui.ctx(), self.theme);
             apply_font_to_context(ui.ctx(), &palette);
-            if let Some(hwnd) = self.hwnd {
+            if let Some(hwnd) = self.hwnd
+                && !native_chrome_requested()
+            {
                 apply_window_override(hwnd, &palette);
             }
             self.theme_dirty = false;
