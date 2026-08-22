@@ -6,6 +6,9 @@
 
 use eframe::Renderer;
 use std::collections::BTreeMap;
+use std::fs::{File, OpenOptions};
+use std::io::Write;
+use std::path::Path;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -47,9 +50,9 @@ pub fn select_renderer() -> RendererSelection {
         "wgpu" => RendererRequest::Wgpu,
         "glow" => RendererRequest::Glow,
         invalid => {
-            eprintln!(
+            report_line(format!(
                 "EdenExplorer: invalid EDEN_RENDERER={invalid:?}; using auto (expected auto, wgpu, or glow)"
-            );
+            ));
             RendererRequest::Auto
         }
     };
@@ -61,7 +64,7 @@ pub fn select_renderer() -> RendererSelection {
         RendererRequest::Glow => Renderer::Glow,
     };
     let selection = RendererSelection { request, selected };
-    eprintln!(
+    report_line(format!(
         "EdenExplorer rendering: requested={:?}, selected={}, session={}, compiled_backends=wgpu,glow",
         selection.request,
         selection.selected,
@@ -70,7 +73,7 @@ pub fn select_renderer() -> RendererSelection {
         } else {
             "console/local"
         },
-    );
+    ));
     selection
 }
 
@@ -93,13 +96,13 @@ fn log_wgpu_adapters() {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
     let adapters = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::all()));
     if adapters.is_empty() {
-        eprintln!("EdenExplorer diagnostics: wgpu adapters=none");
+        report_line("EdenExplorer diagnostics: wgpu adapters=none".to_owned());
         return;
     }
 
     for adapter in adapters {
         let info = adapter.get_info();
-        eprintln!(
+        report_line(format!(
             "EdenExplorer diagnostics wgpu adapter: name={:?} backend={:?} device_type={:?} driver={:?} driver_info={:?} vendor=0x{:04x} device=0x{:04x}",
             info.name,
             info.backend,
@@ -108,7 +111,7 @@ fn log_wgpu_adapters() {
             info.driver_info,
             info.vendor,
             info.device,
-        );
+        ));
     }
 }
 
@@ -131,6 +134,7 @@ static RENDERED_FRAMES: AtomicU64 = AtomicU64::new(0);
 static VIEWPORT_EVENTS: AtomicU64 = AtomicU64::new(0);
 static LAST_REPORT: Mutex<Option<Instant>> = Mutex::new(None);
 static REGION_TIMINGS: OnceLock<Mutex<BTreeMap<&'static str, (u64, u64)>>> = OnceLock::new();
+static DIAGNOSTIC_OUTPUT: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 
 fn enabled() -> bool {
     if DIAGNOSTICS.load(Ordering::Relaxed) == 0 {
@@ -211,21 +215,63 @@ fn maybe_report() {
     if should_report {
         let calls = UI_CALLS.load(Ordering::Relaxed);
         let nanos = UI_NANOS.load(Ordering::Relaxed);
-        eprintln!(
+        report_line(format!(
             "EdenExplorer diagnostics (totals): ui_calls={calls} ui_ms={:.1} repaint_requests={} rendered_frames={} viewport_events={}",
             nanos as f64 / 1_000_000.0,
             REPAINT_REQUESTS.load(Ordering::Relaxed),
             RENDERED_FRAMES.load(Ordering::Relaxed),
             VIEWPORT_EVENTS.load(Ordering::Relaxed),
-        );
+        ));
         if let Some(timings) = REGION_TIMINGS.get() {
             let timings = timings.lock().expect("diagnostic mutex poisoned");
             for (name, (region_calls, region_nanos)) in timings.iter() {
-                eprintln!(
+                report_line(format!(
                     "EdenExplorer diagnostics region: {name} calls={region_calls} ms={:.1}",
                     *region_nanos as f64 / 1_000_000.0,
-                );
+                ));
             }
+        }
+    }
+}
+
+fn report_line(line: String) {
+    eprintln!("{line}");
+    if !diagnostics_requested() {
+        return;
+    }
+
+    let Some(path) = std::env::var_os("EDEN_DIAGNOSTICS_FILE") else {
+        return;
+    };
+    let output =
+        DIAGNOSTIC_OUTPUT.get_or_init(|| Mutex::new(open_diagnostic_file(Path::new(&path))));
+    let mut output = output.lock().expect("diagnostic output mutex poisoned");
+    if let Some(file) = output.as_mut() {
+        let _ = writeln!(file, "{line}");
+        let _ = file.flush();
+    }
+}
+
+fn open_diagnostic_file(path: &Path) -> Option<File> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+        && let Err(error) = std::fs::create_dir_all(parent)
+    {
+        eprintln!(
+            "EdenExplorer: failed to create diagnostics directory {:?}: {error}",
+            parent
+        );
+        return None;
+    }
+
+    match OpenOptions::new().create(true).append(true).open(path) {
+        Ok(file) => Some(file),
+        Err(error) => {
+            eprintln!(
+                "EdenExplorer: failed to open diagnostics file {:?}: {error}",
+                path
+            );
+            None
         }
     }
 }
